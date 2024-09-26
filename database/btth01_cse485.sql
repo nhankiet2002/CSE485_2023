@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 17, 2024 at 09:18 AM
+-- Generation Time: Sep 26, 2024 at 01:50 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -20,6 +20,40 @@ SET time_zone = "+00:00";
 --
 -- Database: `btth01_cse485`
 --
+
+DELIMITER $$
+--
+-- Procedures
+--
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_DSBaiViet` (IN `p_ten_tloai` VARCHAR(50))   BEGIN
+    DECLARE v_ma_tloai INT;
+
+    -- Kiểm tra xem thể loại có tồn tại không
+    SELECT ma_tloai INTO v_ma_tloai
+    FROM theloai
+    WHERE ten_tloai = p_ten_tloai;
+
+    IF v_ma_tloai IS NULL THEN
+        -- Nếu thể loại không tồn tại, hiển thị thông báo lỗi
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Thể loại không tồn tại.';
+    ELSE
+        -- Nếu thể loại tồn tại, truy vấn danh sách bài viết của thể loại đó
+        SELECT 
+            b.ma_bviet AS `Mã bài viết`,
+            b.tieude AS `Tiêu đề bài viết`,
+            b.ten_bhat AS `Tên bài hát`,
+            b.tomtat AS `Tóm tắt`,
+            b.noidung AS `Nội dung`,
+            b.ngayviet AS `Ngày viết`
+        FROM 
+            baiviet b
+        WHERE 
+            b.ma_tloai = v_ma_tloai;
+    END IF;
+END$$
+
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -58,6 +92,45 @@ INSERT INTO `baiviet` (`ma_bviet`, `tieude`, `ten_bhat`, `ma_tloai`, `tomtat`, `
 (12, 'Cây và gió', 'Cây và gió', 7, 'Em và anh, hai đứa quen nhau thật tình cờ. Lời hát của anh từ bài hát “Cây và gió” đã làm tâm hồn em xao động. Nhưng sự thật phũ phàng rằng em chưa bao giờ nói cho anh biết những suy nghĩ tận sâu trong tim mình. Bởi vì em nhút nhát, em không dám đối mặt với thực tế khắc nghiệt, hay thực ra em không dám đối diện với chính mình.', '', 7, '2013-12-05 00:00:00', NULL),
 (13, 'Như một cách tạ ơn đời', 'Người thầy', 2, 'Ánh nắng cuối ngày rồi cũng sẽ tắt, dòng sông con đò rồi cũng sẽ rẽ sang một hướng khác. Nhưng việc trồng người luôn cảm thụ với chuyến đò ngang, cứ tần tảo đưa rồi lặng lẽ quay về đưa sang. Con đò năm xưa của Thầy nặng trĩu yêu thương, hy sinh thầm lặng.', '', 8, '2014-01-02 00:00:00', NULL);
 
+--
+-- Triggers `baiviet`
+--
+DELIMITER $$
+CREATE TRIGGER `tg_CapNhatTheLoai` AFTER INSERT ON `baiviet` FOR EACH ROW BEGIN
+    -- Cập nhật số lượng bài viết cho thể loại mới
+    UPDATE theloai
+    SET SLBaiViet = SLBaiViet + 1
+    WHERE ma_tloai = NEW.ma_tloai;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `tg_CapNhatTheLoai_Delete` AFTER DELETE ON `baiviet` FOR EACH ROW BEGIN
+    -- Giảm số lượng bài viết cho thể loại bài viết bị xóa
+    UPDATE theloai
+    SET SLBaiViet = SLBaiViet - 1
+    WHERE ma_tloai = OLD.ma_tloai;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `tg_CapNhatTheLoai_Update` AFTER UPDATE ON `baiviet` FOR EACH ROW BEGIN
+    -- Nếu thể loại bài viết bị thay đổi
+    IF OLD.ma_tloai <> NEW.ma_tloai THEN
+        -- Giảm số lượng bài viết của thể loại cũ
+        UPDATE theloai
+        SET SLBaiViet = SLBaiViet - 1
+        WHERE ma_tloai = OLD.ma_tloai;
+
+        -- Tăng số lượng bài viết của thể loại mới
+        UPDATE theloai
+        SET SLBaiViet = SLBaiViet + 1
+        WHERE ma_tloai = NEW.ma_tloai;
+    END IF;
+END
+$$
+DELIMITER ;
+
 -- --------------------------------------------------------
 
 --
@@ -92,22 +165,67 @@ INSERT INTO `tacgia` (`ma_tgia`, `ten_tgia`, `hinh_tgia`) VALUES
 
 CREATE TABLE `theloai` (
   `ma_tloai` int(11) NOT NULL,
-  `ten_tloai` varchar(50) NOT NULL
+  `ten_tloai` varchar(50) NOT NULL,
+  `SLBaiViet` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `theloai`
 --
 
-INSERT INTO `theloai` (`ma_tloai`, `ten_tloai`) VALUES
-(1, 'Nhạc trẻ'),
-(2, 'Nhạc trữ tình'),
-(3, 'Nhạc cách mạng'),
-(4, 'Nhạc thiếu nhi'),
-(5, 'Nhạc quê hương'),
-(6, 'POP'),
-(7, 'Rock'),
-(8, 'R&B');
+INSERT INTO `theloai` (`ma_tloai`, `ten_tloai`, `SLBaiViet`) VALUES
+(1, 'Nhạc trẻ', NULL),
+(2, 'Nhạc trữ tình', NULL),
+(3, 'Nhạc cách mạng', NULL),
+(4, 'Nhạc thiếu nhi', NULL),
+(5, 'Nhạc quê hương', NULL),
+(6, 'POP', NULL),
+(7, 'Rock', NULL),
+(8, 'R&B', NULL),
+(12, '...', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user`
+--
+
+CREATE TABLE `user` (
+  `idus` int(11) NOT NULL,
+  `us` varchar(16) NOT NULL,
+  `pw` varchar(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `user`
+--
+
+INSERT INTO `user` (`idus`, `us`, `pw`) VALUES
+(1, 'tuananh', '123456');
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `vw_music`
+-- (See below for the actual view)
+--
+CREATE TABLE `vw_music` (
+`Mã bài viết` int(11)
+,`Tiêu đề bài viết` varchar(200)
+,`Tên bài hát` varchar(100)
+,`Tên tác giả` varchar(100)
+,`Tên thể loại` varchar(50)
+,`Ngày viết` datetime
+);
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `vw_music`
+--
+DROP TABLE IF EXISTS `vw_music`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_music`  AS SELECT `b`.`ma_bviet` AS `Mã bài viết`, `b`.`tieude` AS `Tiêu đề bài viết`, `b`.`ten_bhat` AS `Tên bài hát`, `t`.`ten_tgia` AS `Tên tác giả`, `tl`.`ten_tloai` AS `Tên thể loại`, `b`.`ngayviet` AS `Ngày viết` FROM ((`baiviet` `b` join `tacgia` `t` on(`b`.`ma_tgia` = `t`.`ma_tgia`)) join `theloai` `tl` on(`b`.`ma_tloai` = `tl`.`ma_tloai`)) ;
 
 --
 -- Indexes for dumped tables
@@ -132,6 +250,12 @@ ALTER TABLE `theloai`
   ADD PRIMARY KEY (`ma_tloai`);
 
 --
+-- Indexes for table `user`
+--
+ALTER TABLE `user`
+  ADD PRIMARY KEY (`idus`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -145,13 +269,19 @@ ALTER TABLE `baiviet`
 -- AUTO_INCREMENT for table `tacgia`
 --
 ALTER TABLE `tacgia`
-  MODIFY `ma_tgia` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `ma_tgia` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `theloai`
 --
 ALTER TABLE `theloai`
-  MODIFY `ma_tloai` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `ma_tloai` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
+-- AUTO_INCREMENT for table `user`
+--
+ALTER TABLE `user`
+  MODIFY `idus` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
